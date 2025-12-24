@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xueye.xueyeWarn.mapper.StudentMapper">
+    <!-- 查询所有学生 -->
+    <select id="getAllStudents" resultType="com.xueye.xueyeWarn.bean.Student">
+        SELECT * FROM student
+    </select>
+
+    <!-- 根据ID查询学生 -->
+    <select id="getStudentById" parameterType="Integer" resultType="com.xueye.xueyeWarn.bean.Student">
+        SELECT * FROM student WHERE id = #{id}
+    </select>
+
+    <!-- 添加学生 -->
+    <insert id="addStudent" parameterType="com.xueye.xueyeWarn.bean.Student">
+        INSERT INTO student (student_id, name, gender, major, warning_level)
+        VALUES (#{studentId}, #{name}, #{gender}, #{major}, #{warningLevel})
+    </insert>
+
+    <!-- 修改学生 -->
+    <update id="updateStudent" parameterType="com.xueye.xueyeWarn.bean.Student">
+        UPDATE student
+        SET student_id = #{studentId}, name = #{name}, gender = #{gender}, major = #{major}, warning_level = #{warningLevel}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据姓名查询学生 -->
+    <select id="getStudentByName" parameterType="String" resultType="com.xueye.xueyeWarn.bean.Student">
+        SELECT * FROM student WHERE name = #{name}
+    </select>
+
+    <!-- 删除学生 -->
+    <delete id="deleteStudent" parameterType="Integer">
+        DELETE FROM student WHERE id = #{id}
+    </delete>
+
+    <!-- 预警统计（可视化） -->
+    <select id="getWarningStats" resultType="com.xueye.xueyeWarn.bean.WarningStatsDTO">
+        SELECT warning_level, COUNT(*) AS count FROM student GROUP BY warning_level
+    </select>
+</mapper>

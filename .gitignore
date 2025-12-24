@@ -1,0 +1,41 @@
+# 编译输出
+target/
+*.class
+*.jar
+*.war
+
+# IDE配置
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# 前端依赖
+node_modules/
+dist/
+
+# 日志文件
+*.log
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# Hadoop相关（保留本地，不上传）
+bin/
+
+# 其他
+*.zip
+*.rar
+*.7z
