@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小麦病虫害识别系统 - 图像处理三步流程</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: #f0f5e8;
+  color: #333;
+  min-height: 100vh;
+}
+header {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32, #388e3c);
+  color: white; padding: 24px 20px; text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+header h1 { font-size: 1.6rem; letter-spacing: 2px; }
+header p { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+/* Upload */
+.upload-box {
+  background: white; border-radius: 16px; padding: 40px;
+  text-align: center; margin-bottom: 24px;
+  border: 2px dashed #a5d6a7; cursor: pointer;
+  transition: all 0.3s;
+}
+.upload-box:hover { border-color: #2e7d32; background: #f1f8e9; }
+.upload-box .icon { font-size: 48px; }
+.upload-box h3 { color: #2e7d32; margin: 8px 0 4px; }
+.upload-box p { color: #999; font-size: 0.85rem; }
+.upload-box input[type="file"] { display: none; }
+
+/* Layout */
+.main-layout { display: none; gap: 24px; }
+.main-layout.active { display: grid; grid-template-columns: 280px 1fr; }
+
+/* Steps indicator */
+.steps {
+  display: flex; gap: 8px; margin-bottom: 20px;
+}
+.step {
+  flex: 1; padding: 10px 12px; border-radius: 10px;
+  text-align: center; font-size: 0.85rem; font-weight: 600;
+  background: #e0e0e0; color: #999; transition: all 0.3s;
+}
+.step.active { background: #2e7d32; color: white; }
+.step.done { background: #c8e6c9; color: #2e7d32; }
+.step .num { display: inline-block; width: 22px; height: 22px; line-height: 22px;
+  border-radius: 50%; background: rgba(0,0,0,0.15); margin-right: 6px; font-size: 0.75rem; }
+.step.active .num { background: rgba(255,255,255,0.3); }
+.step.done .num { background: #2e7d32; color: white; }
+
+/* Left panel */
+.panel {
+  background: white; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.panel-header {
+  padding: 14px 16px; font-weight: 600; font-size: 0.95rem;
+  background: #f5f5f5; border-bottom: 1px solid #eee;
+}
+.panel-body { padding: 16px; }
+
+.panel-section { margin-bottom: 16px; }
+.panel-section:last-child { margin-bottom: 0; }
+.panel-section h4 {
+  font-size: 0.85rem; color: #666; margin-bottom: 8px;
+  padding-bottom: 4px; border-bottom: 1px solid #eee;
+}
+
+.check-group { display: flex; flex-direction: column; gap: 6px; }
+.check-group label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  font-size: 0.85rem; transition: background 0.2s;
+}
+.check-group label:hover { background: #f5f5f5; }
+.check-group input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: #2e7d32;
+}
+.check-group label .tag {
+  font-size: 0.7rem; padding: 1px 6px; border-radius: 4px;
+  background: #e8e8e8; color: #888; margin-left: auto;
+}
+
+/* Buttons */
+.btn {
+  display: block; width: 100%; padding: 12px; border: none;
+  border-radius: 10px; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; transition: all 0.3s; text-align: center;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #2e7d32, #43a047);
+  color: white;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(46,125,50,0.3); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: #e8e8e8; color: #555; margin-top: 8px; }
+.btn-secondary:hover { background: #ddd; }
+.btn-loading { pointer-events: none; }
+.btn-loading .btn-text { display: none; }
+.btn-loading::after {
+  content: ''; display: inline-block; width: 18px; height: 18px;
+  border: 3px solid rgba(255,255,255,0.3); border-top-color: white;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Right panel - Image display */
+.image-area { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.image-display {
+  position: relative; width: 100%; min-height: 400px;
+  background: #fafafa; display: flex; align-items: center; justify-content: center;
+}
+.image-display img {
+  max-width: 100%; max-height: 500px; display: block;
+}
+.image-display .placeholder {
+  color: #ccc; font-size: 0.95rem; text-align: center; padding: 40px;
+}
+.image-display .placeholder .big { font-size: 48px; display: block; margin-bottom: 8px; }
+.mode-badge {
+  position: absolute; top: 12px; left: 12px;
+  padding: 6px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+.mode-badge.original { background: #e3f2fd; color: #1565c0; }
+.mode-badge.preview { background: #fff3e0; color: #e65100; }
+.mode-badge.detected { background: #e8f5e9; color: #2e7d32; }
+
+.image-info {
+  padding: 12px 16px; display: flex; justify-content: space-between;
+  border-top: 1px solid #eee; font-size: 0.8rem; color: #888;
+}
+
+/* Gallery grid */
+.gallery { display: none; margin-top: 20px; }
+.gallery.active { display: block; }
+.gallery h4 { font-size: 0.9rem; color: #555; margin-bottom: 10px; }
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.gallery-item {
+  background: white; border-radius: 10px; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.2s;
+}
+.gallery-item:hover { transform: translateY(-2px); }
+.gallery-item .glabel {
+  padding: 6px 10px; font-size: 0.75rem; font-weight: 600;
+  background: #f5f5f5; text-align: center; color: #555;
+}
+.gallery-item .glabel.original { background: #e3f2fd; color: #1565c0; }
+.gallery-item .glabel.combined { background: #e8f5e9; color: #2e7d32; }
+.gallery-item .glabel.single { background: #fff3e0; color: #e65100; }
+.gallery-item img { width: 100%; display: block; min-height: 120px; background: #fafafa; }
+
+/* Detection results */
+.results-area { display: none; margin-top: 20px; }
+.results-area.active { display: block; }
+
+.results-header {
+  background: white; border-radius: 12px 12px 0 0; padding: 14px 16px;
+  font-weight: 600; border-bottom: 1px solid #eee;
+}
+.results-body { background: white; border-radius: 0 0 12px 12px; padding: 12px 16px 16px; }
+
+.stat-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.stat-card {
+  flex: 1; background: #f1f8e9; border-radius: 10px; padding: 12px; text-align: center;
+}
+.stat-card .num { font-size: 1.3rem; font-weight: 700; color: #2e7d32; }
+.stat-card .lbl { font-size: 0.75rem; color: #888; margin-top: 2px; }
+
+.detect-list { list-style: none; }
+.detect-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; margin-bottom: 4px;
+  background: #fafafa; font-size: 0.9rem;
+}
+.detect-item .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.detect-item .name { flex: 1; font-weight: 500; }
+.detect-item .conf {
+  font-size: 0.8rem; font-weight: 600; color: #2e7d32; min-width: 40px; text-align: right;
+}
+.detect-item .bar-wrap { width: 100px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+.detect-item .bar { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, #66bb6a, #43a047); }
+
+.no-result { text-align: center; padding: 20px; color: #999; font-size: 0.9rem; }
+
+footer { text-align: center; padding: 20px; color: #999; font-size: 0.8rem; margin-top: 20px; }
+
+@media (max-width: 768px) {
+  .main-layout.active { grid-template-columns: 1fr; }
+  .compare-row.active { grid-template-columns: 1fr; }
+  .stat-row { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌾 小麦病虫害识别系统</h1>
+  <p>图像处理技术实验 · 三步流程：选图 → 预处理预览 → YOLO识别</p>
+</header>
+
+<div class="container">
+
+  <!-- Upload -->
+  <div class="upload-box" id="uploadBox">
+    <div class="icon">🌾</div>
+    <h3>上传小麦叶片图片</h3>
+    <p>点击或拖拽上传 · 支持 JPG / PNG</p>
+    <input type="file" id="fileInput" accept="image/*">
+  </div>
+
+  <!-- Steps indicator -->
+  <div class="steps" id="steps" style="display:none;">
+    <div class="step" id="step1"><span class="num">1</span>选择图片</div>
+    <div class="step" id="step2"><span class="num">2</span>预处理预览</div>
+    <div class="step" id="step3"><span class="num">3</span>YOLO识别</div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="main-layout" id="mainLayout">
+
+    <!-- Left: Control panel -->
+    <div class="panel">
+      <div class="panel-header">🎛️ 控制面板</div>
+      <div class="panel-body">
+
+        <div class="panel-section">
+          <h4>① 图片文件</h4>
+          <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">重新选择图片</button>
+          <div style="font-size:0.8rem;color:#999;margin-top:6px;" id="fileName">未选择</div>
+        </div>
+
+        <div class="panel-section">
+          <h4>② 图像预处理 — 勾选即实时预览</h4>
+          <div class="check-group" id="preprocessChecks">
+            <label><input type="checkbox" data-key="clahe">
+              CLAHE直方图均衡化 <span class="tag">空间域增强</span></label>
+            <label><input type="checkbox" data-key="gaussian_blur">
+              高斯滤波去噪 <span class="tag">图像恢复</span></label>
+            <label><input type="checkbox" data-key="sharpen">
+              拉普拉斯锐化 <span class="tag">图像分割</span></label>
+            <label><input type="checkbox" data-key="canny">
+              Canny边缘检测 <span class="tag">图像分割</span></label>
+            <label><input type="checkbox" data-key="gamma">
+              伽马校正（幂次变换） <span class="tag">空间域增强</span></label>
+            <label><input type="checkbox" data-key="morphology">
+              形态学开运算去噪 <span class="tag">形态学处理</span></label>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h4>③ YOLOv8x 检测</h4>
+          <button class="btn btn-primary" id="detectBtn" disabled>
+            <span class="btn-text">🚀 执行YOLO识别</span>
+          </button>
+        </div>
+
+        <div class="panel-section">
+          <h4>📷 摄像头实时检测</h4>
+          <button class="btn btn-primary" id="cameraBtn" style="background:linear-gradient(135deg,#1565c0,#1976d2);">
+            <span class="btn-text">🎥 打开摄像头</span>
+          </button>
+          <div id="cameraStatus" style="font-size:0.8rem;color:#999;margin-top:6px;"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right: Image display -->
+    <div>
+      <div class="image-area">
+        <div class="image-display" id="imageDisplay">
+          <div class="placeholder" id="placeholder">
+            <span class="big">📷</span>
+            上传图片后，此处将依次显示<br>原始图 → 预处理效果 → 检测结果
+          </div>
+          <img id="mainImage" style="display:none;">
+          <div class="mode-badge original" id="modeBadge" style="display:none;">原始图像</div>
+        </div>
+        <div class="image-info">
+          <span id="imageStatus">等待上传...</span>
+          <span id="imageSize"></span>
+        </div>
+      </div>
+
+      <!-- Preprocessing gallery -->
+      <div class="gallery" id="gallery">
+        <h4>🎨 预处理效果对比</h4>
+        <div class="gallery-grid" id="galleryGrid"></div>
+      </div>
+
+      <!-- Detection results -->
+      <div class="results-area" id="resultsArea">
+        <div class="results-header">📋 检测结果</div>
+        <div class="results-body">
+          <div class="stat-row" id="statRow"></div>
+          <div id="resultContent">
+            <div class="no-result" id="noResult">点击「YOLO识别」获得检测结果</div>
+            <ul class="detect-list" id="detectList" style="display:none;"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<video id="cameraVideo" autoplay playsinline style="display:none;"></video>
+<canvas id="cameraCanvas" style="display:none;"></canvas>
+<footer>王子涵 · 数据2301班 · 河北农业大学 · 图像处理技术实验</footer>
+
+<script>
+// ===== State =====
+let currentFile = null;
+let currentOriginalBase64 = null;
+let currentMode = 'empty'; // empty / original / preview / detected
+
+// ===== DOM =====
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+const mainLayout = document.getElementById('mainLayout');
+const steps = document.getElementById('steps');
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const step3 = document.getElementById('step3');
+const imageDisplay = document.getElementById('imageDisplay');
+const mainImage = document.getElementById('mainImage');
+const placeholder = document.getElementById('placeholder');
+const modeBadge = document.getElementById('modeBadge');
+const imageStatus = document.getElementById('imageStatus');
+const imageSize = document.getElementById('imageSize');
+const gallery = document.getElementById('gallery');
+const galleryGrid = document.getElementById('galleryGrid');
+const resultsArea = document.getElementById('resultsArea');
+const detectBtn = document.getElementById('detectBtn');
+const statRow = document.getElementById('statRow');
+const detectList = document.getElementById('detectList');
+const noResult = document.getElementById('noResult');
+const fileName = document.getElementById('fileName');
+const checks = document.querySelectorAll('#preprocessChecks input[type="checkbox"]');
+
+// ===== Upload =====
+uploadBox.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+// ===== Preprocessing checkboxes - auto preview =====
+checks.forEach(cb => cb.addEventListener('change', onPreprocessChange));
+
+// ===== Handle file upload =====
+async function handleFile(file) {
+  currentFile = file;
+  fileName.textContent = file.name;
+  mainLayout.classList.add('active');
+  steps.style.display = 'flex';
+  updateSteps(1);
+  resultsArea.classList.remove('active');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    currentOriginalBase64 = e.target.result;
+    showImage(e.target.result, 'original', '原始图像');
+    imageStatus.textContent = '已加载原图';
+    imageSize.textContent = file.name;
+    detectBtn.disabled = false;
+    placeholder.style.display = 'none';
+    mainImage.style.display = 'block';
+    modeBadge.style.display = 'block';
+    gallery.classList.remove('active');
+    currentMode = 'original';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== Preprocessing change =====
+async function onPreprocessChange() {
+  if (!currentFile) return;
+
+  const opts = getPreprocessOptions();
+  const anyChecked = Object.values(opts).some(v => v);
+
+  if (!anyChecked) {
+    showImage(currentOriginalBase64, 'original', '原始图像');
+    gallery.classList.remove('active');
+    currentMode = 'original';
+    updateSteps(1);
+    return;
+  }
+
+  // Fetch all previews from backend
+  updateSteps(2);
+  const formData = new FormData();
+  formData.append('file', currentFile);
+  for (const [key, val] of Object.entries(opts)) {
+    formData.append(key, val ? '1' : '0');
+  }
+
+  try {
+    const res = await fetch('/preview-all', { method: 'POST', body: formData });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    // Build gallery: original + individual ones + combined
+    const items = [];
+
+    // 1) Original
+    items.push(`
+      <div class="gallery-item">
+        <div class="glabel original">📄 原始图像</div>
+        <img src="${'data:image/jpeg;base64,' + data.original_image}">
+      </div>
+    `);
+
+    // 2) Each individual preprocessing step
+    for (const [key, val] of Object.entries(data.individual)) {
+      items.push(`
+        <div class="gallery-item">
+          <div class="glabel single">🔧 ${val.label}</div>
+          <img src="${'data:image/jpeg;base64,' + val.image}">
+        </div>
+      `);
+    }
+
+    // 3) Combined result
+    items.push(`
+      <div class="gallery-item">
+        <div class="glabel combined">✅ 综合效果</div>
+        <img src="${'data:image/jpeg;base64,' + data.combined_image}">
+      </div>
+    `);
+
+    galleryGrid.innerHTML = items.join('');
+    gallery.classList.add('active');
+
+    // Show combined in main view
+    showImage('data:image/jpeg;base64,' + data.combined_image, 'preview', '综合预处理效果');
+    imageStatus.textContent = '预处理预览中';
+    currentMode = 'preview';
+  } catch (e) {
+    console.error('Preview error:', e);
+  }
+}
+
+// ===== Detect =====
+detectBtn.addEventListener('click', async () => {
+  if (!currentFile) return;
+
+  detectBtn.disabled = true;
+  detectBtn.classList.add('btn-loading');
+
+  const opts = getPreprocessOptions();
+  const formData = new FormData();
+  formData.append('file', currentFile);
+  for (const [key, val] of Object.entries(opts)) {
+    formData.append(key, val ? '1' : '0');
+  }
+
+  try {
+    updateSteps(3);
+    const res = await fetch('/detect', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error('检测失败');
+    const data = await res.json();
+
+    // Show detected image
+    showImage('data:image/jpeg;base64,' + data.annotated_image, 'detected', 'YOLO检测结果');
+    imageStatus.textContent = '检测完成';
+    currentMode = 'detected';
+
+    // Show results
+    resultsArea.classList.add('active');
+
+    // Stats
+    const types = new Set(data.detections.map(d => d.class_name));
+    statRow.innerHTML = `
+      <div class="stat-card"><div class="num">${data.object_count}</div><div class="lbl">检测目标</div></div>
+      <div class="stat-card"><div class="num">${data.inference_time_ms}ms</div><div class="lbl">推理耗时</div></div>
+      <div class="stat-card"><div class="num">${types.size}</div><div class="lbl">病害种类</div></div>
+    `;
+
+    // Detection list
+    if (data.detections.length > 0) {
+      noResult.style.display = 'none';
+      detectList.style.display = 'block';
+      const colorMap = {'叶锈病':'#e53935','健康':'#43a047','散黑穗病':'#fb8c00','黄锈病':'#fdd835','秆锈病':'#1e88e5'};
+      detectList.innerHTML = data.detections.map(d => `
+        <li class="detect-item">
+          <span class="dot" style="background:${colorMap[d.class_name]||'#888'}"></span>
+          <span class="name">${d.class_name}</span>
+          <div class="bar-wrap"><div class="bar" style="width:${Math.round(d.confidence*100)}%"></div></div>
+          <span class="conf">${(d.confidence*100).toFixed(1)}%</span>
+        </li>
+      `).join('');
+    } else {
+      noResult.style.display = 'block';
+      noResult.textContent = '✅ 未检测到病害（健康叶片）';
+      detectList.style.display = 'none';
+    }
+
+  } catch (e) {
+    alert('检测失败: ' + e.message);
+  } finally {
+    detectBtn.disabled = false;
+    detectBtn.classList.remove('btn-loading');
+  }
+});
+
+// ===== Camera =====
+let cameraStream = null;
+let cameraInterval = null;
+const cameraVideo = document.getElementById('cameraVideo');
+const cameraCanvas = document.getElementById('cameraCanvas');
+const cameraBtn = document.getElementById('cameraBtn');
+const cameraStatus = document.getElementById('cameraStatus');
+
+cameraBtn.addEventListener('click', async () => {
+  if (cameraStream) {
+    // Stop camera
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+    clearInterval(cameraInterval);
+    cameraBtn.innerHTML = '<span class="btn-text">🎥 打开摄像头</span>';
+    cameraBtn.style.background = 'linear-gradient(135deg,#1565c0,#1976d2)';
+    cameraStatus.textContent = '摄像头已关闭';
+    return;
+  }
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    cameraVideo.srcObject = cameraStream;
+    cameraBtn.innerHTML = '<span class="btn-text">⏹ 关闭摄像头</span>';
+    cameraBtn.style.background = 'linear-gradient(135deg,#c62828,#e53935)';
+    cameraStatus.textContent = '摄像头已开启，实时检测中...';
+
+    // Capture and detect every 2 seconds
+    cameraInterval = setInterval(async () => {
+      cameraCanvas.width = cameraVideo.videoWidth || 640;
+      cameraCanvas.height = cameraVideo.videoHeight || 480;
+      const ctx = cameraCanvas.getContext('2d');
+      ctx.drawImage(cameraVideo, 0, 0);
+      cameraCanvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('file', blob, 'camera.jpg');
+        const opts = getPreprocessOptions();
+        for (const [k, v] of Object.entries(opts)) {
+          formData.append(k, v ? '1' : '0');
+        }
+        try {
+          const res = await fetch('/detect', { method: 'POST', body: formData });
+          if (!res.ok) return;
+          const data = await res.json();
+          showImage('data:image/jpeg;base64,' + data.annotated_image, 'detected', '摄像头检测');
+          if (data.detections.length > 0) {
+            cameraStatus.textContent = `检测到 ${data.object_count} 个目标 | ${data.inference_time_ms}ms`;
+          } else {
+            cameraStatus.textContent = '未检测到病害（健康）';
+          }
+        } catch(e) {}
+      }, 'image/jpeg', 0.8);
+    }, 2000);
+
+  } catch (e) {
+    cameraStatus.textContent = '无法访问摄像头: ' + e.message;
+  }
+});
+
+// ===== Helpers =====
+function getPreprocessOptions() {
+  const opts = {};
+  checks.forEach(cb => { opts[cb.dataset.key] = cb.checked; });
+  return opts;
+}
+
+function showImage(src, mode, label) {
+  mainImage.src = src;
+  mainImage.style.display = 'block';
+  modeBadge.textContent = label;
+  modeBadge.className = 'mode-badge ' + mode;
+  modeBadge.style.display = 'block';
+}
+
+function updateSteps(active) {
+  [step1, step2, step3].forEach((s, i) => {
+    s.className = 'step';
+    if (i + 1 < active) s.classList.add('done');
+    else if (i + 1 === active) s.classList.add('active');
+  });
+}
+</script>
+</body>
+</html>
